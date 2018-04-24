@@ -46,6 +46,8 @@ class ClientSettings:
         """The timeout for a query in seconds. If this time expires
         then the blockchain method will return libbitcoin.server.ErrorCode
         Set to None for no timeout."""
+        if not self._query_expire_time:
+            self._query_expire_time = 5
         return self._query_expire_time
 
     @query_expire_time.setter
