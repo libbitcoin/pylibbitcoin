@@ -15,9 +15,7 @@ def create_random_id():
 class ClientSettings:
 
     def __init__(self):
-        self._renew_time = 5 * 60
         self._query_expire_time = None
-        self._socks5 = None
         self._context = None
 
     @property
@@ -29,17 +27,6 @@ class ClientSettings:
     @context.setter
     def context(self, context):
         self._context = context
-
-    @property
-    def renew_time(self):
-        """The renew time for address or stealth subscriptions.
-        This number should be lower than the setting for the blockchain
-        server. A good value is server_renew_time / 2"""
-        return self._renew_time
-
-    @renew_time.setter
-    def renew_time(self, renew_time):
-        self._renew_time = renew_time
 
     @property
     def query_expire_time(self):
