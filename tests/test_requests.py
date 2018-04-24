@@ -1,5 +1,6 @@
 import unittest
 import asyncio
+import struct
 
 from asynctest import CoroutineMock, MagicMock
 import zmq
@@ -10,8 +11,14 @@ import pylibbitcoin.client
 
 class TestLastHeight(unittest.TestCase):
     def test_last_height(self):
+        reply_id = 2
+        command = b"blockchain.fetch_last_height"
+        error_code = 0
+        reply_data = b"1000"
+
+        pylibbitcoin.client.create_random_id = MagicMock(return_value=reply_id)
         mock_future = CoroutineMock(autospec=asyncio.Future)
-        mock_future.return_value = [1, 2, 3, 4]
+        mock_future.return_value = [command, reply_id, error_code, reply_data]
         asyncio.Future = mock_future
 
         pylibbitcoin.client.RequestCollection = MagicMock()
@@ -31,4 +38,4 @@ class TestLastHeight(unittest.TestCase):
         finally:
             loop.close()
 
-        mock_zmq_socket.send_multipart.assert_called_with()
+        mock_zmq_socket.send_multipart.assert_called_with([command, struct.pack("<I", reply_id), b""])
