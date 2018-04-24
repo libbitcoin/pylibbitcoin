@@ -135,7 +135,7 @@ class Client:
         ]
         await self._socket.send_multipart(request)
 
-    async def request(self, request_command, request_data):
+    async def _request(self, request_command, request_data):
         """Make a generic request. Both options are byte objects specified like
         b"blockchain.fetch_block_header" as an example."""
         future = asyncio.Future()
@@ -160,7 +160,7 @@ class Client:
     async def last_height(self):
         """Fetches the height of the last block in our blockchain."""
         command = b"blockchain.fetch_last_height"
-        ec, data = await self.request(command, b"")
+        ec, data = await self._request(command, b"")
         if ec:
             return ec, None
         # Deserialize data
