@@ -12,6 +12,16 @@ def create_random_id():
     return random.randint(0, MAX_UINT32)
 
 
+def pack_block_index(index):
+    if type(index) == bytes:
+        assert len(index) == 32
+        return index
+    elif type(index) == int:
+        return struct.pack('<I', index)
+    else:
+        raise ValueError("Unknown index type, shoud be an int or a byte array")
+
+
 class ClientSettings:
 
     def __init__(self):
@@ -155,3 +165,12 @@ class Client:
         # Deserialize data
         height = struct.unpack("<I", data)[0]
         return ec, height
+
+    async def block_header(self, index):
+        """Fetches the block header by height or integer index."""
+        command = b"blockchain.fetch_block_header"
+        data = pack_block_index(index)
+        ec, data = await self._request(command, data)
+        if ec:
+            return ec, None
+        return ec, data
