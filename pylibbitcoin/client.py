@@ -24,9 +24,9 @@ def pack_block_index(index):
 
 class ClientSettings:
 
-    def __init__(self):
+    def __init__(self, context=None):
         self._query_expire_time = None
-        self._context = None
+        self._context = context
 
     @property
     def context(self):
