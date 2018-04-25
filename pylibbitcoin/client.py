@@ -2,6 +2,7 @@ import random
 import struct
 import asyncio
 import sys
+from binascii import unhexlify
 import zmq
 import zmq.asyncio
 import pylibbitcoin.error_code
@@ -13,7 +14,8 @@ def create_random_id():
 
 
 def pack_block_index(index):
-    if type(index) == bytes:
+    if type(index) == str:
+        index = unhexlify(index)
         assert len(index) == 32
         return index
     elif type(index) == int:
