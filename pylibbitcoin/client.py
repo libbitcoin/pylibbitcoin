@@ -69,7 +69,6 @@ class RequestCollection:
         self._task.cancel()
 
     async def _receive(self):
-        # Get the reply
         frame = await self._socket.recv_multipart()
         reply = self._deserialize(frame)
         if reply is None:
@@ -81,7 +80,7 @@ class RequestCollection:
         if reply_id in self._futures:
             # Lookup the future based on request ID
             future = self._futures[reply_id]
-            del self._futures[reply_id]
+            self.delete_future(reply_id)
             # Set the result for the future
             try:
                 future.set_result(reply)
@@ -102,6 +101,7 @@ class RequestCollection:
         ]
 
     def add_future(self, request_id, future):
+        # TODO we should maybe check if the request_id is unique
         self._futures[request_id] = future
 
     def delete_future(self, request_id):
