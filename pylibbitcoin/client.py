@@ -139,12 +139,19 @@ class Client:
     async def _request(self, request_command, request_data):
         """Make a generic request. Both options are byte objects specified like
         b"blockchain.fetch_block_header" as an example."""
-        future = asyncio.Future()
-        request_id = create_random_id()
-        self._request_collection.add_future(request_id, future)
+        future, request_id = self._register_future()
 
         await self._send_request(request_command, request_id, request_data)
 
+        return await self._wait_for_reply(future, request_id, request_command)
+
+    def _register_future(self):
+        future = asyncio.Future()
+        request_id = create_random_id()
+        self._request_collection.add_future(request_id, future)
+        return future, request_id
+
+    async def _wait_for_reply(self, future, request_id, request_command):
         expiry_time = self.settings.query_expire_time
         try:
             reply = await asyncio.wait_for(future, expiry_time)
