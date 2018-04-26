@@ -233,3 +233,18 @@ class Client:
 
         data = struct.unpack("<II", data)
         return None, data
+
+    async def spend(self, output_transaction_hash, index):
+        command = b"blockchain.fetch_spend"
+        ec, data = await self._request(
+            command,
+            bitcoin.core.COutPoint(
+                bytes.fromhex(output_transaction_hash)[::-1],
+                index).serialize()
+        )
+        if ec:
+            return ec, None
+
+        # An CInPoint is just an other name for COutPoint
+        point = bitcoin.core.COutPoint.deserialize(data)
+        return None, point
