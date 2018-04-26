@@ -13,6 +13,20 @@ def create_random_id():
     return random.randint(0, MAX_UINT32)
 
 
+def unpack_table(row_fmt, data):
+    # get the number of rows
+    row_size = struct.calcsize(row_fmt)
+    nrows = len(data) // row_size
+
+    # unpack
+    rows = []
+    for idx in range(nrows):
+        offset = idx * row_size
+        row = struct.unpack_from(row_fmt, data, offset)
+        rows.append(row)
+    return rows
+
+
 def pack_block_index(index):
     if type(index) == str:
         index = unhexlify(index)
@@ -182,4 +196,13 @@ class Client:
         ec, data = await self._request(command, data)
         if ec:
             return ec, None
+        return ec, data
+
+    async def block_transaction_hashes(self, index):
+        command = b"blockchain.fetch_block_transaction_hashes"
+        data = pack_block_index(index)
+        ec, data = await self._request(command, data)
+        if ec:
+            return ec, None
+        data = unpack_table("32s", data)
         return ec, data

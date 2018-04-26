@@ -103,3 +103,49 @@ class TestBlockHeader(asynctest.TestCase):
                 unhexlify(header_hash_as_string)
             ]
         )
+
+
+class TestBlockTransactionHashes(asynctest.TestCase):
+    command = b"blockchain.fetch_block_transaction_hashes"
+    reply_id = 2
+    error_code = 0
+    reply_data = b"1000"
+
+    def setUp(self):
+        mock_future = CoroutineMock(
+            autospec=asyncio.Future,
+            return_value=[
+                self.command,
+                self.reply_id,
+                self.error_code,
+                self.reply_data]
+        )()
+        self.c = client_with_mocked_socket()
+        self.c._register_future = lambda: [mock_future, self.reply_id]
+
+    def test_block_transaction_hashes_by_hash(self):
+        header_hash_as_string = \
+            "0000000000000000000aea04dcbdd6a8f16e7ddcc9c43e3701c99308343f493c"
+        self.loop.run_until_complete(
+            self.c.block_transaction_hashes(header_hash_as_string))
+
+        self.c._socket.send_multipart.assert_called_with(
+            [
+                self.command,
+                struct.pack("<I", self.reply_id),
+                unhexlify(header_hash_as_string)
+            ]
+        )
+
+    def test_block_transaction_hashes_by_height(self):
+        block_height = 1234
+        self.loop.run_until_complete(
+            self.c.block_transaction_hashes(block_height))
+
+        self.c._socket.send_multipart.assert_called_with(
+            [
+                self.command,
+                struct.pack("<I", self.reply_id),
+                struct.pack('<I', block_height)
+            ]
+        )
