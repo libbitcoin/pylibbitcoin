@@ -206,3 +206,11 @@ class Client:
             return ec, None
         data = unpack_table("32s", data)
         return ec, data
+
+    async def block_height(self, hash):
+        command = b"blockchain.fetch_block_height"
+        ec, data = await self._request(command, bytes.fromhex(hash)[::-1])
+        if ec:
+            return ec, None
+        data = struct.unpack("<I", data)[0]
+        return ec, data
