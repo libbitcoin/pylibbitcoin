@@ -3,6 +3,7 @@ import struct
 from binascii import unhexlify
 import asynctest
 from asynctest import CoroutineMock, MagicMock
+import bitcoin.core.serialize
 import zmq
 import zmq.asyncio
 
@@ -182,5 +183,38 @@ class TestBlockHeight(asynctest.TestCase):
                 self.command,
                 struct.pack("<I", self.reply_id),
                 bytes.fromhex(header_hash_as_string)[::-1]
+            ]
+        )
+
+
+class TestTransaction(asynctest.TestCase):
+    command = b"blockchain.fetch_transaction"
+    reply_id = 2
+    error_code = 0
+    reply_data = bitcoin.core.CTransaction().serialize()
+
+    def setUp(self):
+        mock_future = CoroutineMock(
+            autospec=asyncio.Future,
+            return_value=[
+                self.command,
+                self.reply_id,
+                self.error_code,
+                self.reply_data]
+        )()
+        self.c = client_with_mocked_socket()
+        self.c._register_future = lambda: [mock_future, self.reply_id]
+
+    def test_transaction(self):
+        transaction_hash = \
+            "e400712f48693950b78aef3e298b590cfd4bc9a1a91beb0547fb25bc73d220b9"
+        self.loop.run_until_complete(
+            self.c.transaction(transaction_hash))
+
+        self.c._socket.send_multipart.assert_called_with(
+            [
+                self.command,
+                struct.pack("<I", self.reply_id),
+                bytes.fromhex(transaction_hash)[::-1]
             ]
         )

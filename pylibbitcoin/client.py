@@ -5,6 +5,7 @@ import sys
 from binascii import unhexlify
 import zmq
 import zmq.asyncio
+import bitcoin.core.serialize
 import pylibbitcoin.error_code
 
 
@@ -214,3 +215,12 @@ class Client:
             return ec, None
         data = struct.unpack("<I", data)[0]
         return ec, data
+
+    async def transaction(self, hash):
+        command = b"blockchain.fetch_transaction"
+        ec, data = await self._request(command, bytes.fromhex(hash)[::-1])
+        if ec:
+            return ec, None
+
+        transaction = bitcoin.core.CTransaction.deserialize(data)
+        return None, transaction
