@@ -1,6 +1,8 @@
 import asyncio
 import sys
 import pylibbitcoin.client
+import binascii
+import struct
 
 
 def block_header(client):
@@ -27,8 +29,14 @@ async def main():
 
     client = pylibbitcoin.client.Client("tcp://mainnet.libbitcoin.net:9091")
 
-    result = await commands[sys.argv[1]](client)
-    print(result)
+    ec, result = await commands[sys.argv[1]](client)
+    # unpack according to
+    # https://en.bitcoin.it/wiki/Protocol_documentation#Block_Headers
+    version, prev, root, timestamp, bits, nounce = \
+        struct.unpack('<I32s32sIII', result)
+    print(binascii.hexlify(prev[::-1]).decode('utf8'))
+    print(binascii.hexlify(root[::-1]).decode('utf8'))
+
     client.stop()
 
 if __name__ == '__main__':
