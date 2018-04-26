@@ -69,13 +69,14 @@ class TestBlockHeader(asynctest.TestCase):
         c = client_with_mocked_socket()
         c._register_future = lambda: [mock_future, self.reply_id]
 
-        self.loop.run_until_complete(c.block_header(1234))
+        block_height = 1234
+        self.loop.run_until_complete(c.block_header(block_height))
 
         c._socket.send_multipart.assert_called_with(
             [
                 self.command,
                 struct.pack("<I", self.reply_id),
-                struct.pack('<I', 1234)
+                struct.pack('<I', block_height)
             ]
         )
 
