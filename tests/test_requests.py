@@ -218,3 +218,36 @@ class TestTransaction(asynctest.TestCase):
                 bytes.fromhex(transaction_hash)[::-1]
             ]
         )
+
+
+class TestTransactionIndex(asynctest.TestCase):
+    command = b"blockchain.fetch_transaction_index"
+    reply_id = 2
+    error_code = 0
+    reply_data = b"10001000"
+
+    def setUp(self):
+        mock_future = CoroutineMock(
+            autospec=asyncio.Future,
+            return_value=[
+                self.command,
+                self.reply_id,
+                self.error_code,
+                self.reply_data]
+        )()
+        self.c = client_with_mocked_socket()
+        self.c._register_future = lambda: [mock_future, self.reply_id]
+
+    def test_transaction_index(self):
+        transaction_hash = \
+            "e400712f48693950b78aef3e298b590cfd4bc9a1a91beb0547fb25bc73d220b9"
+        self.loop.run_until_complete(
+            self.c.transaction_index(transaction_hash))
+
+        self.c._socket.send_multipart.assert_called_with(
+            [
+                self.command,
+                struct.pack("<I", self.reply_id),
+                bytes.fromhex(transaction_hash)[::-1]
+            ]
+        )

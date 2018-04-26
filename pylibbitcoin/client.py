@@ -224,3 +224,12 @@ class Client:
 
         transaction = bitcoin.core.CTransaction.deserialize(data)
         return None, transaction
+
+    async def transaction_index(self, hash):
+        command = b"blockchain.fetch_transaction_index"
+        ec, data = await self._request(command, bytes.fromhex(hash)[::-1])
+        if ec:
+            return ec, None
+
+        data = struct.unpack("<II", data)
+        return None, data
