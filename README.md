@@ -1,4 +1,4 @@
-This library exposes the Query Service of libbitcoin.
+This library exposes the Query Service of (libbitcoin-server)[https://github.com/libbitcoin/libbitcoin-server].
 
 # Tests
 
