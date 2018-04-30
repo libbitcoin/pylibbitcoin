@@ -129,7 +129,7 @@ setup(
     #
     # For an analysis of "install_requires" vs pip's requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
-    install_requires=['pyzmq'],  # Optional
+    install_requires=['pyzmq', 'python-bitcoinlib'],  # Optional
 
     # List additional groups of dependencies here (e.g. development
     # dependencies). Users will be able to install these using the "extras"
@@ -141,7 +141,7 @@ setup(
     # projects.
     extras_require={  # Optional
         'dev': ['flake8'],
-        #'test': ['coverage'],
+        'test': ['asynctest'],
     },
 
     # List additional URLs that are relevant to your project as a dict.
