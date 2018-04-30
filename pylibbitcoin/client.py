@@ -197,7 +197,7 @@ class Client:
         ec, data = await self._request(command, data)
         if ec:
             return ec, None
-        return ec, data
+        return ec, bitcoin.core.CBlockHeader.deserialize(data)
 
     async def block_transaction_hashes(self, index):
         command = b"blockchain.fetch_block_transaction_hashes"

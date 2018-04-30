@@ -55,7 +55,7 @@ class TestBlockHeader(asynctest.TestCase):
     command = b"blockchain.fetch_block_header"
     reply_id = 2
     error_code = 0
-    reply_data = b"1000"
+    reply_data = bitcoin.core.CBlockHeader().serialize()
 
     def test_block_header_by_height(self):
         mock_future = CoroutineMock(
