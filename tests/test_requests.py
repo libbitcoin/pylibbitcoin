@@ -271,7 +271,7 @@ class TestSpend(asynctest.TestCase):
         self.c = client_with_mocked_socket()
         self.c._register_future = lambda: [mock_future, self.reply_id]
 
-    def test_transaction_index(self):
+    def test_spend(self):
         transaction_hash = \
             "0530375a5bf4ea9a82494fcb5ef4a61076c2af807982076fa810851f4bc31c09"
         index = 0
