@@ -248,3 +248,12 @@ class Client:
         # An CInPoint is just an other name for COutPoint
         point = bitcoin.core.COutPoint.deserialize(data)
         return None, point
+
+    async def possibly_unconfirmed_transaction(self, hash):
+        command = b"transaction_pool.fetch_transaction"
+        ec, data = await self._request(command, bytes.fromhex(hash)[::-1])
+        if ec:
+            return ec, None
+
+        transaction = bitcoin.core.CTransaction.deserialize(data)
+        return None, transaction

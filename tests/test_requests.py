@@ -286,3 +286,36 @@ class TestSpend(asynctest.TestCase):
                     bytes.fromhex(transaction_hash)[::-1], index).serialize()
             ]
         )
+
+class TestTransactionPoolTransaction(asynctest.TestCase):
+    command = b"transaction_pool.fetch_transaction"
+    reply_id = 2
+    error_code = 0
+    reply_data = bitcoin.core.CTransaction().serialize()
+
+    def setUp(self):
+        mock_future = CoroutineMock(
+            autospec=asyncio.Future,
+            return_value=[
+                self.command,
+                self.reply_id,
+                self.error_code,
+                self.reply_data]
+        )()
+        self.c = client_with_mocked_socket()
+        self.c._register_future = lambda: [mock_future, self.reply_id]
+
+    def test_transaction_pool_transaction(self):
+        transaction_hash = \
+            "0530375a5bf4ea9a82494fcb5ef4a61076c2af807982076fa810851f4bc31c09"
+        index = 0
+        self.loop.run_until_complete(
+            self.c.possibly_unconfirmed_transaction(transaction_hash))
+
+        self.c._socket.send_multipart.assert_called_with(
+            [
+                self.command,
+                struct.pack("<I", self.reply_id),
+                bytes.fromhex(transaction_hash)[::-1]
+            ]
+        )
