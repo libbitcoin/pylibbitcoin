@@ -69,11 +69,47 @@ class ClientSettings:
         self._query_expire_time = query_expire_time
 
 
+class Request:
+    """
+    This class represents a _send_ Request
+    """
+
+    def __init__(self, command):
+        """ Use 'create' instead"""
+        self.id = create_random_id()
+        self.command = command
+        self.future = asyncio.Future()
+
+    async def create(socket, command, data):
+        """ Use 'create' to create a Request object. The payload is already
+        sent."""
+        request = Request(command)
+        await request._send(socket, data)
+        return request
+
+    async def _send(self, socket, data):
+        request = [
+            self.command,
+            struct.pack("<I", self.id),
+            data
+        ]
+        await socket.send_multipart(request)
+
+    # TODO
+    def is_subscription(self):
+        """ If the request is a subscription then the response to this request
+        is a notification (as defined here https://github.com/libbitcoin/libbitcoin-server/wiki/Query-Service#subscribeaddress)""" # noqa: E501,E261
+        return False
+
+    def __str__(self):
+        return("Request %d: %s" % (self.id, self.command))
+
+
 class RequestCollection:
 
     def __init__(self, socket):
         self._socket = socket
-        self._futures = {}
+        self._requests = {}
 
         loop = asyncio.get_event_loop()
         self._task = loop.create_task(self._run())
@@ -94,13 +130,13 @@ class RequestCollection:
             return
 
         command, response_id, *_ = response
-        if response_id in self._futures:
+        if response_id in self._requests:
             # Lookup the future based on request ID
-            future = self._futures[response_id]
-            self.delete_future(response_id)
+            request = self._requests[response_id]
+            self.delete_request(request)
             # Set the result for the future
             try:
-                future.set_result(response)
+                request.future.set_result(response)
             except asyncio.InvalidStateError:
                 # Future timed out.
                 pass
@@ -117,12 +153,12 @@ class RequestCollection:
             frame[2][4:]                            # Data
         ]
 
-    def add_future(self, request_id, future):
+    def add_request(self, request):
         # TODO we should maybe check if the request_id is unique
-        self._futures[request_id] = future
+        self._requests[request.id] = request
 
-    def delete_future(self, request_id):
-        del self._futures[request_id]
+    def delete_request(self, request):
+        del self._requests[request.id]
 
 
 class Client:
@@ -151,32 +187,31 @@ class Client:
         ]
         await self._socket.send_multipart(request)
 
-    async def _request(self, request_command, request_data):
+    async def _request(self, command, data):
         """Make a generic request. Both options are byte objects specified like
         b"blockchain.fetch_block_header" as an example."""
-        future, request_id = self._register_future()
+        request = await Request.create(self._socket, command, data)
+        self._request_collection.add_request(request)
 
-        await self._send_request(request_command, request_id, request_data)
-
-        return await self._wait_for_response(future, request_id, request_command)
+        return await self._wait_for_response(request)
 
     def _register_future(self):
         future = asyncio.Future()
         request_id = create_random_id()
-        self._request_collection.add_future(request_id, future)
+        self._request_collection.add_request(request_id, future)
         return future, request_id
 
-    async def _wait_for_response(self, future, request_id, request_command):
+    async def _wait_for_response(self, request):
         expiry_time = self.settings.query_expire_time
         try:
-            response = await asyncio.wait_for(future, expiry_time)
+            response = await asyncio.wait_for(request.future, expiry_time)
         except asyncio.TimeoutError:
-            self._request_collection.delete_future(request_id)
+            self._request_collection.delete_request(request.id)
             return pylibbitcoin.error_code.ErrorCode.channel_timeout, None
 
         response_command, response_id, ec, data = response
-        assert response_command == request_command
-        assert response_id == request_id
+        assert response_command == request.command
+        assert response_id == request.id
         ec = pylibbitcoin.error_code.make_error_code(ec)
         return ec, data
 
