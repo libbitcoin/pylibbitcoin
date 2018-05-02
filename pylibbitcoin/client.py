@@ -96,7 +96,7 @@ class Request:
     # TODO
     def is_subscription(self):
         """ If the request is a subscription then the response to this request
-        is a notification (as defined here https://github.com/libbitcoin/libbitcoin-server/wiki/Query-Service#subscribeaddress)""" # noqa: E501,E261
+        is a notification (as defined here https://github.com/libbitcoin/libbitcoin-server/wiki/Query-Service#subscribeaddress)"""  # noqa: E501
         return False
 
     def __str__(self):
