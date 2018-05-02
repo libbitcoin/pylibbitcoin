@@ -87,25 +87,25 @@ class RequestCollection:
 
     async def _receive(self):
         frame = await self._socket.recv_multipart()
-        reply = self._deserialize(frame)
-        if reply is None:
-            print("Error: bad reply sent by server. Discarding.",
+        response = self._deserialize(frame)
+        if response is None:
+            print("Error: bad response sent by server. Discarding.",
                   file=sys.stderr)
             return
 
-        command, reply_id, *_ = reply
-        if reply_id in self._futures:
+        command, response_id, *_ = response
+        if response_id in self._futures:
             # Lookup the future based on request ID
-            future = self._futures[reply_id]
-            self.delete_future(reply_id)
+            future = self._futures[response_id]
+            self.delete_future(response_id)
             # Set the result for the future
             try:
-                future.set_result(reply)
+                future.set_result(response)
             except asyncio.InvalidStateError:
                 # Future timed out.
                 pass
         else:
-            print("Error: unhandled frame %s:%s." % (command, reply_id))
+            print("Error: unhandled frame %s:%s." % (command, response_id))
 
     def _deserialize(self, frame):
         if len(frame) != 3:
@@ -158,7 +158,7 @@ class Client:
 
         await self._send_request(request_command, request_id, request_data)
 
-        return await self._wait_for_reply(future, request_id, request_command)
+        return await self._wait_for_response(future, request_id, request_command)
 
     def _register_future(self):
         future = asyncio.Future()
@@ -166,17 +166,17 @@ class Client:
         self._request_collection.add_future(request_id, future)
         return future, request_id
 
-    async def _wait_for_reply(self, future, request_id, request_command):
+    async def _wait_for_response(self, future, request_id, request_command):
         expiry_time = self.settings.query_expire_time
         try:
-            reply = await asyncio.wait_for(future, expiry_time)
+            response = await asyncio.wait_for(future, expiry_time)
         except asyncio.TimeoutError:
             self._request_collection.delete_future(request_id)
             return pylibbitcoin.error_code.ErrorCode.channel_timeout, None
 
-        reply_command, reply_id, ec, data = reply
-        assert reply_command == request_command
-        assert reply_id == request_id
+        response_command, response_id, ec, data = response
+        assert response_command == request_command
+        assert response_id == request_id
         ec = pylibbitcoin.error_code.make_error_code(ec)
         return ec, data
 
