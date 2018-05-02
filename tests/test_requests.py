@@ -9,6 +9,19 @@ import zmq.asyncio
 
 import pylibbitcoin.client
 
+"""
+api_interactions has all API calls.
+request: [command, request_id, data]
+response: [command, request_id, error_code + data]
+Note that the response has the error code and the data in one frame!
+"""
+api_interactions = {
+    "last_height": {
+        "request": [b"blockchain.fetch_last_height", b"\x02\x00\x00\x00", b""],
+        "response": [b"blockchain.fetch_last_height", b"\x02\x00\x00\x00", b"\x00\x00\x00\x00\xe8\x03\x00\x00"],  # noqa: E501
+    },
+}
+
 
 def client_with_mocked_socket():
     pylibbitcoin.client.RequestCollection = MagicMock()
@@ -20,35 +33,46 @@ def client_with_mocked_socket():
     mock_zmq_context = MagicMock(autospec=zmq.asyncio.Context)
     mock_zmq_context.socket.return_value = mock_zmq_socket
 
-    settings = pylibbitcoin.client.ClientSettings(context=mock_zmq_context)
+    settings = pylibbitcoin.client.ClientSettings(
+        context=mock_zmq_context,
+        timeout=0.01)
 
     return pylibbitcoin.client.Client('irrelevant', settings)
 
 
+def deserialize_response(frame):
+    return [
+            frame[0],                               # Command
+            struct.unpack("<I", frame[1])[0],       # Request ID
+            struct.unpack("<I", frame[2][:4])[0],   # Error Code
+            frame[2][4:]                            # Data
+        ]
+
+
 class TestLastHeight(asynctest.TestCase):
-    command = b"blockchain.fetch_last_height"
-    reply_id = 2
-    error_code = 0
-    reply_data = b"1000"
+    pylibbitcoin.client.create_random_id = lambda: 2
 
-    def test_last_height(self):
-        mock_future = CoroutineMock(
-            autospec=asyncio.Future,
-            return_value=[
-                self.command,
-                self.reply_id,
-                self.error_code,
-                self.reply_data]
-        )()
-
+    def test_correctness_of_request(self):
         c = client_with_mocked_socket()
-        c._register_future = lambda: [mock_future, self.reply_id]
 
         self.loop.run_until_complete(c.last_height())
 
         c._socket.send_multipart.assert_called_with(
-            [self.command, struct.pack("<I", self.reply_id), b""]
+            api_interactions["last_height"]["request"]
         )
+
+    def test_response_handling(self):
+        c = client_with_mocked_socket()
+        asyncio.Future = CoroutineMock(
+            autospec=asyncio.Future,
+            return_value=deserialize_response(
+                api_interactions["last_height"]["response"])
+        )
+
+        error_code, height = self.loop.run_until_complete(c.last_height())
+
+        self.assertEqual(1000, height)
+        self.assertIsNone(error_code)
 
 
 class TestBlockHeader(asynctest.TestCase):
