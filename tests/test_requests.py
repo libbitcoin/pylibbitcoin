@@ -18,7 +18,12 @@ Note that the response has the error code and the data in one frame!
 api_interactions = {
     "last_height": {
         "request": [b"blockchain.fetch_last_height", b"\x02\x00\x00\x00", b""],
-        "response": [b"blockchain.fetch_last_height", b"\x02\x00\x00\x00", b"\x00\x00\x00\x00\xe8\x03\x00\x00"],  # noqa: E501
+        "response": [b"blockchain.fetch_last_height", b"\x02\x00\x00\x00", b"\x00\x00\x00\x00" + b"\xe8\x03\x00\x00"],  # noqa: E501
+    },
+    "block_header": {
+        "request_with_height": [b"blockchain.fetch_block_header", b"\x02\x00\x00\x00", b'@\r\x03\x00'],  # noqa: E501
+        "request_with_hash": [b"blockchain.fetch_block_header", b"\x02\x00\x00\x00", unhexlify("4286e1e988ce7af64b82275f5ae36407c92da522a79461851541b66b29e1e63b")],  # noqa: E501
+        "response": [b"blockchain.fetch_block_header", b"\x02\x00\x00\x00", b"\x00\x00\x00\x00" + bitcoin.core.CBlockHeader().serialize()],  # noqa: E501
     },
 }
 
@@ -71,64 +76,46 @@ class TestLastHeight(asynctest.TestCase):
 
         error_code, height = self.loop.run_until_complete(c.last_height())
 
-        self.assertEqual(1000, height)
+        self.assertEqual(height, 1000)
         self.assertIsNone(error_code)
 
 
 class TestBlockHeader(asynctest.TestCase):
-    command = b"blockchain.fetch_block_header"
-    reply_id = 2
-    error_code = 0
-    reply_data = bitcoin.core.CBlockHeader().serialize()
+    pylibbitcoin.client.create_random_id = lambda: 2
 
-    def test_block_header_by_height(self):
-        mock_future = CoroutineMock(
-            autospec=asyncio.Future,
-            return_value=[
-                self.command,
-                self.reply_id,
-                self.error_code,
-                self.reply_data]
-        )()
-
+    def test_correctness_of_request_with_height(self):
         c = client_with_mocked_socket()
-        c._register_future = lambda: [mock_future, self.reply_id]
 
-        block_height = 1234
-        self.loop.run_until_complete(c.block_header(block_height))
+        self.loop.run_until_complete(c.block_header(200_000))
 
         c._socket.send_multipart.assert_called_with(
-            [
-                self.command,
-                struct.pack("<I", self.reply_id),
-                struct.pack('<I', block_height)
-            ]
+            api_interactions["block_header"]["request_with_height"]
         )
 
-    def test_block_header_by_hash(self):
-        mock_future = CoroutineMock(
-            autospec=asyncio.Future,
-            return_value=[
-                self.command,
-                self.reply_id,
-                self.error_code,
-                self.reply_data]
-        )()
-
+    def test_correctness_of_request_with_hash(self):
         c = client_with_mocked_socket()
-        c._register_future = lambda: [mock_future, self.reply_id]
 
         header_hash_as_string = \
-            "0000000000000000000aea04dcbdd6a8f16e7ddcc9c43e3701c99308343f493c"
+            "4286e1e988ce7af64b82275f5ae36407c92da522a79461851541b66b29e1e63b"
         self.loop.run_until_complete(c.block_header(header_hash_as_string))
 
         c._socket.send_multipart.assert_called_with(
-            [
-                self.command,
-                struct.pack("<I", self.reply_id),
-                unhexlify(header_hash_as_string)
-            ]
+            api_interactions["block_header"]["request_with_hash"]
         )
+
+    def test_response_handling(self):
+        c = client_with_mocked_socket()
+        asyncio.Future = CoroutineMock(
+            autospec=asyncio.Future,
+            return_value=deserialize_response(
+                api_interactions["block_header"]["response"])
+        )
+
+        error_code, block = self.loop.run_until_complete(
+            c.block_header(200_000))
+
+        self.assertIsNone(error_code)
+        self.assertIsInstance(block, bitcoin.core.CBlockHeader)
 
 
 class TestBlockTransactionHashes(asynctest.TestCase):
