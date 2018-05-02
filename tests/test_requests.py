@@ -309,7 +309,6 @@ class TestTransactionPoolTransaction(asynctest.TestCase):
     def test_transaction_pool_transaction(self):
         transaction_hash = \
             "0530375a5bf4ea9a82494fcb5ef4a61076c2af807982076fa810851f4bc31c09"
-        index = 0
         self.loop.run_until_complete(
             self.c.possibly_unconfirmed_transaction(transaction_hash))
 
@@ -343,7 +342,6 @@ class TestTransaction2(asynctest.TestCase):
     def test_transaction2(self):
         transaction_hash = \
             "0530375a5bf4ea9a82494fcb5ef4a61076c2af807982076fa810851f4bc31c09"
-        index = 0
         self.loop.run_until_complete(
             self.c.transaction2(transaction_hash))
 
