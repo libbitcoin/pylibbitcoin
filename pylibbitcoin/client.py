@@ -41,8 +41,8 @@ def pack_block_index(index):
 
 class ClientSettings:
 
-    def __init__(self, context=None):
-        self._query_expire_time = None
+    def __init__(self, timeout=2, context=None):
+        self._timeout = timeout
         self._context = context
 
     @property
@@ -56,17 +56,15 @@ class ClientSettings:
         self._context = context
 
     @property
-    def query_expire_time(self):
+    def timeout(self):
         """The timeout for a query in seconds. If this time expires
         then the blockchain method will return libbitcoin.server.ErrorCode
         Set to None for no timeout."""
-        if not self._query_expire_time:
-            self._query_expire_time = 5
-        return self._query_expire_time
+        return self._timeout
 
-    @query_expire_time.setter
-    def query_expire_time(self, query_expire_time):
-        self._query_expire_time = query_expire_time
+    @timeout.setter
+    def timeout(self, timeout):
+        self._timeout = timeout
 
 
 class Request:
@@ -202,7 +200,7 @@ class Client:
         return future, request_id
 
     async def _wait_for_response(self, request):
-        expiry_time = self.settings.query_expire_time
+        expiry_time = self.settings.timeout
         try:
             response = await asyncio.wait_for(request.future, expiry_time)
         except asyncio.TimeoutError:
