@@ -193,12 +193,6 @@ class Client:
 
         return await self._wait_for_response(request)
 
-    def _register_future(self):
-        future = asyncio.Future()
-        request_id = create_random_id()
-        self._request_collection.add_request(request_id, future)
-        return future, request_id
-
     async def _wait_for_response(self, request):
         expiry_time = self.settings.timeout
         try:
