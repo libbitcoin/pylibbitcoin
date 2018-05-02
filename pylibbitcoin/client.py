@@ -267,7 +267,7 @@ class Client:
         transaction = bitcoin.core.CTransaction.deserialize(data)
         return None, transaction
 
-    async def transaction2(self, hash):
+    async def transaction_pool_transaction2(self, hash):
         command = b"transaction_pool.fetch_transaction"
         ec, data = await self._request(command, bytes.fromhex(hash)[::-1])
         if ec:
