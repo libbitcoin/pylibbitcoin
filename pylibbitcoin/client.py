@@ -2,10 +2,11 @@ import random
 import struct
 import asyncio
 import sys
-from binascii import unhexlify
+from binascii import unhexlify, hexlify
 import zmq
 import zmq.asyncio
 import bitcoin.core.serialize
+import bitcoin.base58
 import pylibbitcoin.error_code
 
 
@@ -57,9 +58,7 @@ class ClientSettings:
 
     @property
     def timeout(self):
-        """The timeout for a query in seconds. If this time expires
-        then the blockchain method will return libbitcoin.server.ErrorCode
-        Set to None for no timeout."""
+        """Set to None for no timeout."""
         return self._timeout
 
     @timeout.setter
@@ -69,7 +68,8 @@ class ClientSettings:
 
 class Request:
     """
-    This class represents a _send_ Request
+    This class represents a _send_ Request.
+    This is either a simple request/response affair or a subscription.
     """
 
     def __init__(self, command):
@@ -77,6 +77,7 @@ class Request:
         self.id = create_random_id()
         self.command = command
         self.future = asyncio.Future()
+        self.queue = None
 
     async def create(socket, command, data):
         """ Use 'create' to create a Request object. The payload is already
@@ -97,14 +98,37 @@ class Request:
     def is_subscription(self):
         """ If the request is a subscription then the response to this request
         is a notification (as defined here https://github.com/libbitcoin/libbitcoin-server/wiki/Query-Service#subscribeaddress)"""  # noqa: E501
-        return False
+        return self.queue is not None
 
     def __str__(self):
         return("Request %d: %s" % (self.id, self.command))
 
 
-class RequestCollection:
+class InvalidServerResponseException(Exception):
+    pass
 
+
+class Response:
+
+    def __init__(self, frame):
+        if len(frame) != 3:
+            raise InvalidServerResponseException(
+                "Length of the frame was not 3: %d" % len(frame))
+
+        self.command = frame[0]
+        self.request_id = struct.unpack("<I", frame[1])[0]
+        self.error_code = struct.unpack("<I", frame[2][:4])[0]
+        self.data = frame[2][4:]
+
+    def is_bound_for_queue(self):
+        return len(self.data) > 0
+
+
+class RequestCollection:
+    """
+    RequestCollection carries a list of Requests and matches incoming responses
+    to them.
+    """
     def __init__(self, socket):
         self._socket = socket
         self._requests = {}
@@ -121,35 +145,30 @@ class RequestCollection:
 
     async def _receive(self):
         frame = await self._socket.recv_multipart()
-        response = self._deserialize(frame)
+        response = Response(frame)
         if response is None:
             print("Error: bad response sent by server. Discarding.",
                   file=sys.stderr)
             return
 
-        command, response_id, *_ = response
-        if response_id in self._requests:
-            # Lookup the future based on request ID
-            request = self._requests[response_id]
-            self.delete_request(request)
-            # Set the result for the future
-            try:
-                request.future.set_result(response)
-            except asyncio.InvalidStateError:
-                # Future timed out.
-                pass
+        if response.request_id in self._requests:
+            self._handle_response(response)
         else:
-            print("Error: unhandled frame %s:%s." % (command, response_id))
+            print(
+                "Error: unhandled response %s:%s." %
+                (response.command, response.request_id))
 
-    def _deserialize(self, frame):
-        if len(frame) != 3:
-            return None
-        return [
-            frame[0],                               # Command
-            struct.unpack("<I", frame[1])[0],       # Request ID
-            struct.unpack("<I", frame[2][:4])[0],   # Error Code
-            frame[2][4:]                            # Data
-        ]
+    def _handle_response(self, response):
+        request = self._requests[response.request_id]
+
+        if request.is_subscription():
+            if response.is_bound_for_queue():
+                request.queue.put_nowait(response.data)
+            else:
+                request.future.set_result(response)
+        else:
+            self.delete_request(request)
+            request.future.set_result(response)
 
     def add_request(self, request):
         # TODO we should maybe check if the request_id is unique
@@ -177,13 +196,15 @@ class Client:
         socket.connect(self._url)
         return socket
 
-    async def _send_request(self, command, request_id, data):
-        request = [
-            command,
-            struct.pack("<I", request_id),
-            data
-        ]
-        await self._socket.send_multipart(request)
+    async def _subscription_request(self, command, data):
+        request = await self._request(command, data)
+        request.queue = asyncio.Queue()
+        ec, _ = await self._wait_for_response(request)
+        return ec, request.queue
+
+    async def _simple_request(self, command, data):
+        return await self._wait_for_response(
+            await self._request(command, data))
 
     async def _request(self, command, data):
         """Make a generic request. Both options are byte objects specified like
@@ -191,26 +212,25 @@ class Client:
         request = await Request.create(self._socket, command, data)
         self._request_collection.add_request(request)
 
-        return await self._wait_for_response(request)
+        return request
 
     async def _wait_for_response(self, request):
         expiry_time = self.settings.timeout
         try:
             response = await asyncio.wait_for(request.future, expiry_time)
         except asyncio.TimeoutError:
-            self._request_collection.delete_request(request.id)
+            self._request_collection.delete_request(request)
             return pylibbitcoin.error_code.ErrorCode.channel_timeout, None
 
-        response_command, response_id, ec, data = response
-        assert response_command == request.command
-        assert response_id == request.id
-        ec = pylibbitcoin.error_code.make_error_code(ec)
-        return ec, data
+        assert response.command == request.command
+        assert response.request_id == request.id
+        ec = pylibbitcoin.error_code.make_error_code(response.error_code)
+        return ec, response.data
 
     async def last_height(self):
         """Fetches the height of the last block in our blockchain."""
         command = b"blockchain.fetch_last_height"
-        ec, data = await self._request(command, b"")
+        ec, data = await self._simple_request(command, b"")
         if ec:
             return ec, None
         # Deserialize data
@@ -221,7 +241,7 @@ class Client:
         """Fetches the block header by height or integer index."""
         command = b"blockchain.fetch_block_header"
         data = pack_block_index(index)
-        ec, data = await self._request(command, data)
+        ec, data = await self._simple_request(command, data)
         if ec:
             return ec, None
         return ec, bitcoin.core.CBlockHeader.deserialize(data)
@@ -229,7 +249,7 @@ class Client:
     async def block_transaction_hashes(self, index):
         command = b"blockchain.fetch_block_transaction_hashes"
         data = pack_block_index(index)
-        ec, data = await self._request(command, data)
+        ec, data = await self._simple_request(command, data)
         if ec:
             return ec, None
         data = unpack_table("32s", data)
@@ -237,7 +257,8 @@ class Client:
 
     async def block_height(self, hash):
         command = b"blockchain.fetch_block_height"
-        ec, data = await self._request(command, bytes.fromhex(hash)[::-1])
+        ec, data = await self._simple_request(
+            command, bytes.fromhex(hash)[::-1])
         if ec:
             return ec, None
         data = struct.unpack("<I", data)[0]
@@ -245,7 +266,8 @@ class Client:
 
     async def transaction(self, hash):
         command = b"blockchain.fetch_transaction"
-        ec, data = await self._request(command, bytes.fromhex(hash)[::-1])
+        ec, data = await self._simple_request(
+            command, bytes.fromhex(hash)[::-1])
         if ec:
             return ec, None
 
@@ -254,7 +276,8 @@ class Client:
 
     async def transaction_index(self, hash):
         command = b"blockchain.fetch_transaction_index"
-        ec, data = await self._request(command, bytes.fromhex(hash)[::-1])
+        ec, data = await self._simple_request(
+            command, bytes.fromhex(hash)[::-1])
         if ec:
             return ec, None
 
@@ -263,7 +286,7 @@ class Client:
 
     async def spend(self, output_transaction_hash, index):
         command = b"blockchain.fetch_spend"
-        ec, data = await self._request(
+        ec, data = await self._simple_request(
             command,
             bitcoin.core.COutPoint(
                 bytes.fromhex(output_transaction_hash)[::-1],
@@ -278,7 +301,8 @@ class Client:
 
     async def possibly_unconfirmed_transaction(self, hash):
         command = b"transaction_pool.fetch_transaction"
-        ec, data = await self._request(command, bytes.fromhex(hash)[::-1])
+        ec, data = await self._simple_request(
+            command, bytes.fromhex(hash)[::-1])
         if ec:
             return ec, None
 
@@ -287,7 +311,8 @@ class Client:
 
     async def transaction2(self, hash):
         command = b"blockchain.fetch_transaction2"
-        ec, data = await self._request(command, bytes.fromhex(hash)[::-1])
+        ec, data = await self._simple_request(
+            command, bytes.fromhex(hash)[::-1])
         if ec:
             return ec, None
 
@@ -296,9 +321,22 @@ class Client:
 
     async def transaction_pool_transaction2(self, hash):
         command = b"transaction_pool.fetch_transaction"
-        ec, data = await self._request(command, bytes.fromhex(hash)[::-1])
+        ec, data = await self._simple_request(
+            command, bytes.fromhex(hash)[::-1])
         if ec:
             return ec, None
 
         transaction = bitcoin.core.CTransaction.deserialize(data)
         return None, transaction
+
+    async def subscribe_address(self, address):
+        command = b"subscribe.address"
+        decoded_address = bitcoin.base58.decode(address)
+        # pick the decoded bytes apart:
+        # version_byte, data, checksum = decoded_address[0:1], decoded_address[1:-4], decoded_address[-4:]  # noqa: E501
+        ec, queue = await self._subscription_request(
+            command, hexlify(decoded_address[1:-4]))
+        if ec:
+            return ec, None
+
+        return None, queue
