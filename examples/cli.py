@@ -33,6 +33,16 @@ def spend(client):
     return client.spend(hash, index)
 
 
+async def subscribe_address(client):
+    address = sys.argv[2]
+    ec, queue = await client.subscribe_address(address)
+    asyncio.get_event_loop().create_task(_read_from(queue))
+    return ec, None
+
+async def _read_from(queue):
+    while True:
+        print(await queue.get())
+
 commands = {
     "last_height": last_height,
     "block_header": block_header,
@@ -40,6 +50,7 @@ commands = {
     "transaction": transaction,
     "transaction_index": transaction_index,
     "spend": spend,
+    "subscribe_address": subscribe_address,
 }
 
 
@@ -50,21 +61,16 @@ async def main():
     if command not in commands:
         sys.exit("Command can be %s" % str.join(", ", iter(commands)))
 
-    client = pylibbitcoin.client.Client("tcp://mainnet.libbitcoin.net:9091")
+    # client = pylibbitcoin.client.Client("tcp://127.0.0.1:9999", settings=pylibbitcoin.client.ClientSettings(timeout=5))
+    # client = pylibbitcoin.client.Client("tcp://mainnet.libbitcoin.net:9091")
 
+    client = pylibbitcoin.client.Client("tcp://testnet1.libbitcoin.net:19091")
     ec, result = await commands[sys.argv[1]](client)
-    # print(bitcoin.core.CBlockHeader.deserialize(result))
-    # unpack according to
-    # https://en.bitcoin.it/wiki/Protocol_documentation#Block_Headers
-    # version, prev, root, timestamp, bits, nounce = \
-    #     struct.unpack('<I32s32sIII', result)
-    # print(binascii.hexlify(prev[::-1]).decode('utf8'))
-    # print(binascii.hexlify(root[::-1]).decode('utf8'))
+
     print("Error code: %s" % ec)
-    print(result)
-    client.stop()
+    print("Result: %s" % result)
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     loop.run_until_complete(main())
-    loop.close()
+    # loop.close()
