@@ -335,7 +335,7 @@ class Client:
         # pick the decoded bytes apart:
         # version_byte, data, checksum = decoded_address[0:1], decoded_address[1:-4], decoded_address[-4:]  # noqa: E501
         ec, queue = await self._subscription_request(
-            command, hexlify(decoded_address[1:-4]))
+            command, decoded_address[1:-4])
         if ec:
             return ec, None
 
