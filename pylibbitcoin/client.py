@@ -2,7 +2,7 @@ import random
 import struct
 import asyncio
 import sys
-from binascii import unhexlify, hexlify
+from binascii import unhexlify
 import zmq
 import zmq.asyncio
 import bitcoin.core.serialize
@@ -94,14 +94,13 @@ class Request:
         ]
         await socket.send_multipart(request)
 
-    # TODO
     def is_subscription(self):
         """ If the request is a subscription then the response to this request
         is a notification (as defined here https://github.com/libbitcoin/libbitcoin-server/wiki/Query-Service#subscribeaddress)"""  # noqa: E501
         return self.queue is not None
 
     def __str__(self):
-        return("Request %d: %s" % (self.id, self.command))
+        return("Request(command, ID) %s, %d" % (self.command, self.id))
 
 
 class InvalidServerResponseException(Exception):
@@ -117,11 +116,17 @@ class Response:
 
         self.command = frame[0]
         self.request_id = struct.unpack("<I", frame[1])[0]
-        self.error_code = struct.unpack("<I", frame[2][:4])[0]
+        ec = struct.unpack("<I", frame[2][:4])[0]
+        self.error_code = pylibbitcoin.error_code.make_error_code(ec)
         self.data = frame[2][4:]
 
     def is_bound_for_queue(self):
         return len(self.data) > 0
+
+    def __str__(self):
+        return "Response(command, request ID, error code, data):"\
+            + " %s, %d, %s, %s"\
+            % (self.command, self.request_id, self.error_code, self.data)
 
 
 class RequestCollection:
@@ -224,8 +229,7 @@ class Client:
 
         assert response.command == request.command
         assert response.request_id == request.id
-        ec = pylibbitcoin.error_code.make_error_code(response.error_code)
-        return ec, response.data
+        return response.error_code, response.data
 
     async def last_height(self):
         """Fetches the height of the last block in our blockchain."""
