@@ -1,7 +1,6 @@
 import random
 import struct
 import asyncio
-import sys
 from binascii import unhexlify
 import zmq
 import zmq.asyncio
@@ -151,10 +150,6 @@ class RequestCollection:
     async def _receive(self):
         frame = await self._socket.recv_multipart()
         response = Response(frame)
-        if response is None:
-            print("Error: bad response sent by server. Discarding.",
-                  file=sys.stderr)
-            return
 
         if response.request_id in self._requests:
             self._handle_response(response)
@@ -220,9 +215,10 @@ class Client:
         return request
 
     async def _wait_for_response(self, request):
-        expiry_time = self.settings.timeout
         try:
-            response = await asyncio.wait_for(request.future, expiry_time)
+            response = await asyncio.wait_for(
+                request.future,
+                self.settings.timeout)
         except asyncio.TimeoutError:
             self._request_collection.delete_request(request)
             return pylibbitcoin.error_code.ErrorCode.channel_timeout, None
@@ -279,6 +275,8 @@ class Client:
         return None, transaction
 
     async def transaction_index(self, hash):
+        """Fetch the block height that contains a transaction and its index
+        within that block."""
         command = b"blockchain.fetch_transaction_index"
         ec, data = await self._simple_request(
             command, bytes.fromhex(hash)[::-1])
