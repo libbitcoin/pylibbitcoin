@@ -170,6 +170,7 @@ class RequestCollection:
 
         if request.is_subscription():
             if response.is_bound_for_queue():
+                # TODO decode the data into something usable
                 request.queue.put_nowait(response.data)
             else:
                 request.future.set_result(response)
