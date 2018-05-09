@@ -352,7 +352,7 @@ class Client:
     # TODO this call should ideally also remove the subscription request from the RequestCollection.
     # This call solicits a final call from the server with a `error::service_stopped` error code.
     async def unsubscribe_address(self, address):
-        command = b"unsubscribe_address"
+        command = b"unsubscribe.address"
         decoded_address = decode_address(address)
         return await self._simple_request(
             command, decoded_address)
