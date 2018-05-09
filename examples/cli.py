@@ -37,6 +37,12 @@ async def subscribe_address(client):
     address = sys.argv[2]
     return await client.subscribe_address(address)
 
+
+def unsubscribe_address(client):
+    address = sys.argv[2]
+    return client.unsubscribe_address(address)
+
+
 async def _read_from(queue):
     while True:
         print(await queue.get())
@@ -49,6 +55,7 @@ commands = {
     "transaction_index": transaction_index,
     "spend": spend,
     "subscribe_address": subscribe_address,
+    "unsubscribe_address": unsubscribe_address,
 }
 
 

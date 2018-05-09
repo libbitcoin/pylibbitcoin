@@ -39,6 +39,13 @@ def pack_block_index(index):
         raise ValueError("Unknown index type, shoud be an int or a byte array")
 
 
+def decode_address(address):
+    decoded_address = bitcoin.base58.decode(address)
+    # pick the decoded bytes apart:
+    # version_byte, data, checksum = decoded_address[0:1], decoded_address[1:-4], decoded_address[-4:]  # noqa: E501
+    return decoded_address[1:-4]
+
+
 class ClientSettings:
 
     def __init__(self, timeout=2, context=None):
@@ -333,12 +340,18 @@ class Client:
 
     async def subscribe_address(self, address):
         command = b"subscribe.address"
-        decoded_address = bitcoin.base58.decode(address)
-        # pick the decoded bytes apart:
-        # version_byte, data, checksum = decoded_address[0:1], decoded_address[1:-4], decoded_address[-4:]  # noqa: E501
+        decoded_address = decode_address(address)
         ec, queue = await self._subscription_request(
-            command, decoded_address[1:-4])
+            command, decoded_address)
         if ec:
             return ec, None
 
         return None, queue
+
+    # TODO this call should ideally also remove the subscription request from the RequestCollection.
+    # This call solicits a final call from the server with a `error::service_stopped` error code.
+    async def unsubscribe_address(self, address):
+        command = b"unsubscribe_address"
+        decoded_address = decode_address(address)
+        return await self._simple_request(
+            command, decoded_address)
