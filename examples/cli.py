@@ -35,9 +35,7 @@ def spend(client):
 
 async def subscribe_address(client):
     address = sys.argv[2]
-    ec, queue = await client.subscribe_address(address)
-    asyncio.get_event_loop().create_task(_read_from(queue))
-    return ec, None
+    return await client.subscribe_address(address)
 
 async def _read_from(queue):
     while True:
@@ -54,7 +52,7 @@ commands = {
 }
 
 
-async def main():
+def main():
     if len(sys.argv) < 2:
         sys.exit("Usage: %s last_height|block_header|<cmd>" % sys.argv[0])
     command = sys.argv[1]
@@ -65,12 +63,19 @@ async def main():
     # client = pylibbitcoin.client.Client("tcp://mainnet.libbitcoin.net:9091")
 
     client = pylibbitcoin.client.Client("tcp://testnet1.libbitcoin.net:19091")
-    ec, result = await commands[sys.argv[1]](client)
 
+    loop = asyncio.get_event_loop()
+
+    ec, result = loop.run_until_complete(commands[sys.argv[1]](client))
     print("Error code: %s" % ec)
     print("Result: %s" % result)
 
+    if type(result) == asyncio.queues.Queue:
+        loop.run_until_complete(_read_from(result))
+
+    client.stop()
+    loop.close()
+
+
 if __name__ == '__main__':
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main())
-    # loop.close()
+    main()
