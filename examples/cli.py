@@ -1,5 +1,7 @@
 import asyncio
 import sys
+import binascii
+import bitcoin.core
 import pylibbitcoin.client
 
 
@@ -43,6 +45,12 @@ def unsubscribe_address(client):
     return client.unsubscribe_address(address)
 
 
+def broadcast(client):
+    # Grab a raw block from https://blockchain.info/block/000000000000000000a7b4999c723ed9f308425708577c76827ade51062e135a?format=hex  # noqa: E501
+    # This might seem odd but this is a sanity check a client should probably do.
+    block = bitcoin.core.CBlock.deserialize(binascii.unhexlify(sys.argv[2]))
+    return client.broadcast(binascii.hexlify(block.serialize()))
+
 async def _read_from(queue):
     while True:
         print(await queue.get())
@@ -56,6 +64,7 @@ commands = {
     "spend": spend,
     "subscribe_address": subscribe_address,
     "unsubscribe_address": unsubscribe_address,
+    "broadcast": broadcast,
 }
 
 

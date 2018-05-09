@@ -355,3 +355,7 @@ class Client:
         decoded_address = decode_address(address)
         return await self._simple_request(
             command, decoded_address)
+
+    async def broadcast(self, block):
+        command = b"blockchain.broadcast"
+        return await self._simple_request(command, unhexlify(block))
