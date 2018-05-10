@@ -1,5 +1,10 @@
 This library exposes the Query Service of [libbitcoin-server](https://github.com/libbitcoin/libbitcoin-server).
 
+# Requirements
+
+- `python3-dev`
+
+
 # Tests
 
 The project uses `unittest` and can be run with:
