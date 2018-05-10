@@ -384,3 +384,15 @@ class Client:
         points = [make_tuple(row) for row in rows]
 
         return None, points
+
+    async def validate(self, block):
+        command = b"blockchain.validate"
+        return await self._simple_request(command, unhexlify(block))
+
+    async def transaction_pool_broadcast(self, block):
+        command = b"transaction_pool.broadcast"
+        return await self._simple_request(command, unhexlify(block))
+
+    async def transaction_pool_validate2(self, tx):
+        command = b"transaction_pool.validate2"
+        return await self._simple_request(command, unhexlify(tx))
