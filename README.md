@@ -1,4 +1,4 @@
-This library exposes the Query Service of (libbitcoin-server)[https://github.com/libbitcoin/libbitcoin-server].
+This library exposes the Query Service of [libbitcoin-server](https://github.com/libbitcoin/libbitcoin-server).
 
 # Tests
 
@@ -10,7 +10,7 @@ $ python3 -m unittest
 
 # Example
 
-The project contains a trivial CLI example. Set `$PYTHONPATH` to include the project root (typically `cd <path-to-project> && export $PYTHONPATH=.`).
+The project contains a trivial CLI example. Set `$PYTHONPATH` to include the project root (typically `cd <path-to-project> && export PYTHONPATH=.`).
 Then run with:
 
 ```
