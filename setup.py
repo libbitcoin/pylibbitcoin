@@ -40,7 +40,7 @@ setup(
     # For a discussion on single-sourcing the version across setup.py and the
     # project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='0.0.1.dev1',  # Required
+    version='0.0.1rc1',  # Required
 
     # This is a one-line description or tagline of what your project does. This
     # corresponds to the "Summary" metadata field:
@@ -110,7 +110,7 @@ setup(
     # project page. What does your project relate to?
     #
     # Note that this is a string of words separated by whitespace, not a list.
-    keywords='bitcoin libbitcoin blockchain library',  # Optional
+    keywords='bitcoin libbitcoin blockchain library zmq',  # Optional
 
     # You can just specify package directories manually here if your project is
     # simple. Or you can use find_packages().
@@ -154,9 +154,7 @@ setup(
     # maintainers, and where to support the project financially. The key is
     # what's used to render the link text on PyPI.
     project_urls={  # Optional
-        'Bug Reports': 'https://github.com/pypa/sampleproject/issues',
-        'Funding': 'https://donate.pypi.org',
-        'Say Thanks!': 'http://saythanks.io/to/example',
-        'Source': 'https://github.com/pypa/sampleproject/',
+        'Bug Reports': 'https://github.com/libbitcoin/pylibbitcoin/issues',
+        'Source': 'https://github.com/libbitcoin/pylibbitcoin/',
     },
 )
