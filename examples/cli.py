@@ -40,6 +40,11 @@ async def subscribe_address(client):
     return await client.subscribe_address(address)
 
 
+async def _read_from(queue):
+    while True:
+        print(await queue.get())
+
+
 def unsubscribe_address(client):
     address = sys.argv[2]
     return client.unsubscribe_address(address)
@@ -47,13 +52,16 @@ def unsubscribe_address(client):
 
 def broadcast(client):
     # Grab a raw block from https://blockchain.info/block/000000000000000000a7b4999c723ed9f308425708577c76827ade51062e135a?format=hex  # noqa: E501
-    # This might seem odd but this is a sanity check a client should probably do.
+    # This might seem odd but this is a sanity check a client should probably do.  # noqa: E501
     block = bitcoin.core.CBlock.deserialize(binascii.unhexlify(sys.argv[2]))
     return client.broadcast(binascii.hexlify(block.serialize()))
 
-async def _read_from(queue):
-    while True:
-        print(await queue.get())
+
+async def history3(client):
+    address = sys.argv[2]
+    start_height = 10_000
+    return await client.history3(address, start_height)
+
 
 commands = {
     "last_height": last_height,
@@ -65,6 +73,7 @@ commands = {
     "subscribe_address": subscribe_address,
     "unsubscribe_address": unsubscribe_address,
     "broadcast": broadcast,
+    "history3": history3,
 }
 
 

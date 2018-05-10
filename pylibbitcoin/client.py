@@ -9,6 +9,10 @@ import bitcoin.base58
 import pylibbitcoin.error_code
 
 
+def to_little_endian(i):
+    return struct.pack("<I", i)
+
+
 def create_random_id():
     MAX_UINT32 = 4294967295
     return random.randint(0, MAX_UINT32)
@@ -95,7 +99,7 @@ class Request:
     async def _send(self, socket, data):
         request = [
             self.command,
-            struct.pack("<I", self.id),
+            to_little_endian(self.id),
             data
         ]
         await socket.send_multipart(request)
@@ -349,8 +353,10 @@ class Client:
 
         return None, queue
 
-    # TODO this call should ideally also remove the subscription request from the RequestCollection.
-    # This call solicits a final call from the server with a `error::service_stopped` error code.
+    # TODO this call should ideally also remove the subscription request from
+    # the RequestCollection.
+    # This call solicits a final call from the server with a
+    # `error::service_stopped` error code.
     async def unsubscribe_address(self, address):
         command = b"unsubscribe.address"
         decoded_address = decode_address(address)
@@ -360,3 +366,21 @@ class Client:
     async def broadcast(self, block):
         command = b"blockchain.broadcast"
         return await self._simple_request(command, unhexlify(block))
+
+    async def history3(self, address, height=0):
+        command = b"blockchain.fetch_history3"
+        decoded_address = decode_address(address)
+        ec, raw_points = await self._simple_request(
+            command,
+            decoded_address + to_little_endian(height))
+        if ec:
+            return ec, None
+
+        def make_tuple(row):
+            id, tx_hash, index, height, value = row
+            return (id, bitcoin.core.COutPoint(tx_hash, index), height, value)
+
+        rows = unpack_table("<B32sIIQ", raw_points)
+        points = [make_tuple(row) for row in rows]
+
+        return None, points
