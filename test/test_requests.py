@@ -319,7 +319,7 @@ class TestTransactionPoolTransaction(asynctest.TestCase):
         transaction_hash = \
             "0530375a5bf4ea9a82494fcb5ef4a61076c2af807982076fa810851f4bc31c09"
         self.loop.run_until_complete(
-            c.possibly_unconfirmed_transaction(transaction_hash))
+            c.mempool_transaction(transaction_hash))
 
         c._socket.send_multipart.assert_called_with(
             api_interactions["transaction_pool_transaction"]["request"]
@@ -336,7 +336,7 @@ class TestTransactionPoolTransaction(asynctest.TestCase):
         )
 
         error_code, transaction = self.loop.run_until_complete(
-            c.possibly_unconfirmed_transaction(transaction_hash))
+            c.mempool_transaction(transaction_hash))
 
         self.assertIsNone(error_code)
         self.assertIsInstance(transaction, bitcoin.core.CTransaction)

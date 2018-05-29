@@ -10,7 +10,7 @@ import bitcoin.base58
 import pylibbitcoin.error_code
 
 
-def checksum(hash, index):
+def checksum(hash_, index):
     """
     This method takes a transaction hash and an index and returns a checksum.
 
@@ -21,7 +21,7 @@ def checksum(hash, index):
     mask = 0xffffffffffff8000
     magic_start_position = 12
 
-    hash_bytes = bytes.fromhex(hash)[::-1]
+    hash_bytes = bytes.fromhex(hash_)[::-1]
     last_20_bytes = hash_bytes[magic_start_position:]
 
     assert len(hash_bytes) == 32
@@ -33,8 +33,8 @@ def checksum(hash, index):
     return hash_upper_49_bits | index_lower_15_bits
 
 
-def to_int(b):
-    return int.from_bytes(b, byteorder='little')
+def to_int(some_bytes):
+    return int.from_bytes(some_bytes, byteorder='little')
 
 
 def to_little_endian(i):
@@ -112,7 +112,7 @@ class Request:
 
     def __init__(self, command):
         """ Use 'create' instead"""
-        self.id = create_random_id()
+        self.id_ = create_random_id()
         self.command = command
         self.future = asyncio.Future()
         self.queue = None
@@ -127,7 +127,7 @@ class Request:
     async def send(self, socket, data):
         request = [
             self.command,
-            to_little_endian(self.id),
+            to_little_endian(self.id_),
             data
         ]
         await socket.send_multipart(request)
@@ -138,7 +138,7 @@ class Request:
         return self.queue is not None
 
     def __str__(self):
-        return "Request(command, ID) {}, {:d}".format(self.command, self.id)
+        return "Request(command, ID) {}, {:d}".format(self.command, self.id_)
 
 
 class InvalidServerResponseException(Exception):
@@ -154,8 +154,8 @@ class Response:
 
         self.command = frame[0]
         self.request_id = struct.unpack("<I", frame[1])[0]
-        ec = struct.unpack("<I", frame[2][:4])[0]
-        self.error_code = pylibbitcoin.error_code.make_error_code(ec)
+        error_code = struct.unpack("<I", frame[2][:4])[0]
+        self.error_code = pylibbitcoin.error_code.make_error_code(error_code)
         self.data = frame[2][4:]
 
     def is_bound_for_queue(self):
@@ -212,10 +212,10 @@ class RequestCollection:
 
     def add_request(self, request):
         # TODO we should maybe check if the request_id is unique
-        self._requests[request.id] = request
+        self._requests[request.id_] = request
 
     def delete_request(self, request):
-        del self._requests[request.id]
+        del self._requests[request.id_]
 
 
 class Client:
@@ -239,8 +239,8 @@ class Client:
     async def _subscription_request(self, command, data):
         request = await self._request(command, data)
         request.queue = asyncio.Queue()
-        ec, _ = await self._wait_for_response(request)
-        return ec, request.queue
+        error_code, _ = await self._wait_for_response(request)
+        return error_code, request.queue
 
     async def _simple_request(self, command, data):
         return await self._wait_for_response(
@@ -264,109 +264,109 @@ class Client:
             return pylibbitcoin.error_code.ErrorCode.channel_timeout, None
 
         assert response.command == request.command
-        assert response.request_id == request.id
+        assert response.request_id == request.id_
         return response.error_code, response.data
 
     async def last_height(self):
         """Fetches the height of the last block in our blockchain."""
         command = b"blockchain.fetch_last_height"
-        ec, data = await self._simple_request(command, b"")
-        if ec:
-            return ec, None
+        error_code, data = await self._simple_request(command, b"")
+        if error_code:
+            return error_code, None
         # Deserialize data
         height = struct.unpack("<I", data)[0]
-        return ec, height
+        return error_code, height
 
     async def block_header(self, index):
         """Fetches the block header by height or integer index."""
         command = b"blockchain.fetch_block_header"
         data = pack_block_index(index)
-        ec, data = await self._simple_request(command, data)
-        if ec:
-            return ec, None
-        return ec, bitcoin.core.CBlockHeader.deserialize(data)
+        error_code, data = await self._simple_request(command, data)
+        if error_code:
+            return error_code, None
+        return error_code, bitcoin.core.CBlockHeader.deserialize(data)
 
     async def block_transaction_hashes(self, index):
         command = b"blockchain.fetch_block_transaction_hashes"
         data = pack_block_index(index)
-        ec, data = await self._simple_request(command, data)
-        if ec:
-            return ec, None
+        error_code, data = await self._simple_request(command, data)
+        if error_code:
+            return error_code, None
         data = unpack_table("32s", data)
-        return ec, data
+        return error_code, data
 
-    async def block_height(self, hash):
+    async def block_height(self, hash_):
         command = b"blockchain.fetch_block_height"
-        ec, data = await self._simple_request(
-            command, bytes.fromhex(hash)[::-1])
-        if ec:
-            return ec, None
+        error_code, data = await self._simple_request(
+            command, bytes.fromhex(hash_)[::-1])
+        if error_code:
+            return error_code, None
         data = struct.unpack("<I", data)[0]
-        return ec, data
+        return error_code, data
 
-    async def transaction(self, hash):
+    async def transaction(self, hash_):
         command = b"blockchain.fetch_transaction"
-        ec, data = await self._simple_request(
-            command, bytes.fromhex(hash)[::-1])
-        if ec:
-            return ec, None
+        error_code, data = await self._simple_request(
+            command, bytes.fromhex(hash_)[::-1])
+        if error_code:
+            return error_code, None
 
         transaction = bitcoin.core.CTransaction.deserialize(data)
         return None, transaction
 
-    async def transaction_index(self, hash):
+    async def transaction_index(self, hash_):
         """Fetch the block height that contains a transaction and its index
         within that block."""
         command = b"blockchain.fetch_transaction_index"
-        ec, data = await self._simple_request(
-            command, bytes.fromhex(hash)[::-1])
-        if ec:
-            return ec, None
+        error_code, data = await self._simple_request(
+            command, bytes.fromhex(hash_)[::-1])
+        if error_code:
+            return error_code, None
 
         data = struct.unpack("<II", data)
         return None, data
 
     async def spend(self, output_transaction_hash, index):
         command = b"blockchain.fetch_spend"
-        ec, data = await self._simple_request(
+        error_code, data = await self._simple_request(
             command,
             bitcoin.core.COutPoint(
                 bytes.fromhex(output_transaction_hash)[::-1],
                 index).serialize()
         )
-        if ec:
-            return ec, None
+        if error_code:
+            return error_code, None
 
         # An CInPoint is just an other name for COutPoint
         point = bitcoin.core.COutPoint.deserialize(data)
         return None, point
 
-    async def possibly_unconfirmed_transaction(self, hash):
+    async def mempool_transaction(self, hash_):
         command = b"transaction_pool.fetch_transaction"
-        ec, data = await self._simple_request(
-            command, bytes.fromhex(hash)[::-1])
-        if ec:
-            return ec, None
+        error_code, data = await self._simple_request(
+            command, bytes.fromhex(hash_)[::-1])
+        if error_code:
+            return error_code, None
 
         transaction = bitcoin.core.CTransaction.deserialize(data)
         return None, transaction
 
-    async def transaction2(self, hash):
+    async def transaction2(self, hash_):
         command = b"blockchain.fetch_transaction2"
-        ec, data = await self._simple_request(
-            command, bytes.fromhex(hash)[::-1])
-        if ec:
-            return ec, None
+        error_code, data = await self._simple_request(
+            command, bytes.fromhex(hash_)[::-1])
+        if error_code:
+            return error_code, None
 
         transaction = bitcoin.core.CTransaction.deserialize(data)
         return None, transaction
 
-    async def transaction_pool_transaction2(self, hash):
+    async def transaction_pool_transaction2(self, hash_):
         command = b"transaction_pool.fetch_transaction"
-        ec, data = await self._simple_request(
-            command, bytes.fromhex(hash)[::-1])
-        if ec:
-            return ec, None
+        error_code, data = await self._simple_request(
+            command, bytes.fromhex(hash_)[::-1])
+        if error_code:
+            return error_code, None
 
         transaction = bitcoin.core.CTransaction.deserialize(data)
         return None, transaction
@@ -374,10 +374,10 @@ class Client:
     async def subscribe_address(self, address):
         command = b"subscribe.address"
         decoded_address = decode_address(address)
-        ec, queue = await self._subscription_request(
+        error_code, queue = await self._subscription_request(
             command, decoded_address)
-        if ec:
-            return ec, None
+        if error_code:
+            return error_code, None
 
         return None, queue
 
@@ -398,11 +398,11 @@ class Client:
     async def history3(self, address, height=0):
         command = b"blockchain.fetch_history3"
         decoded_address = decode_address(address)
-        ec, raw_points = await self._simple_request(
+        error_code, raw_points = await self._simple_request(
             command,
             decoded_address + to_little_endian(height))
-        if ec:
-            return ec, None
+        if error_code:
+            return error_code, None
 
         def make_tuple(row):
             kind, tx_hash, index, height, value = row
@@ -429,9 +429,9 @@ class Client:
         command = b"transaction_pool.broadcast"
         return await self._simple_request(command, unhexlify(block))
 
-    async def transaction_pool_validate2(self, tx):
+    async def transaction_pool_validate2(self, transaction):
         command = b"transaction_pool.validate2"
-        return await self._simple_request(command, unhexlify(tx))
+        return await self._simple_request(command, unhexlify(transaction))
 
     async def balance(self, address):
         error, history = await self.history3(address)
