@@ -1,6 +1,7 @@
 import random
 import struct
 import asyncio
+import functools
 from binascii import unhexlify
 import zmq
 import zmq.asyncio
@@ -431,6 +432,23 @@ class Client:
     async def transaction_pool_validate2(self, tx):
         command = b"transaction_pool.validate2"
         return await self._simple_request(command, unhexlify(tx))
+
+    async def balance(self, address):
+        error, history = await self.history3(address)
+        if error:
+            return error, None
+
+        utxo = Client.__receives_without_spends(history)
+
+        return None, functools.reduce(
+            lambda accumulator, point: accumulator + point['value'], utxo, 0)
+
+    async def unspend(self, address):
+        error, history = await self.history3(address)
+        if error:
+            return error, None
+
+        return None, Client.__receives_without_spends(history)
 
     @staticmethod
     def __receives_without_spends(history):

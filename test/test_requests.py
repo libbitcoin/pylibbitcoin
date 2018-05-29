@@ -509,3 +509,36 @@ class TestTransactionPoolValidate(asynctest.TestCase):
             c.transaction_pool_validate2(block))
 
         self.assertIsNone(error_code)
+
+
+class TestBalance(asynctest.TestCase):
+    def test_utxo_summation(self):
+        c = client_with_mocked_socket()
+
+        address = "mngSWw2NC9M1ctqZQxz65DwVomCjm7TWPJ"
+        c._wait_for_response = CoroutineMock(
+            return_value=raw_response_to_return_type(
+                api_interactions["history3"]["response"])
+        )
+
+        error_code, balance = self.loop.run_until_complete(
+            c.balance(address))
+
+        self.assertEqual(balance, 1271100000)
+
+
+class TestUnspend(asynctest.TestCase):
+    def test_utxo(self):
+        c = client_with_mocked_socket()
+
+        address = "mngSWw2NC9M1ctqZQxz65DwVomCjm7TWPJ"
+        c._wait_for_response = CoroutineMock(
+            return_value=raw_response_to_return_type(
+                api_interactions["history3"]["response"])
+        )
+
+        error_code, unspends = self.loop.run_until_complete(
+            c.unspend(address))
+
+        self.assertIsNone(error_code)
+        self.assertEqual(len(list(unspends)), 20)
