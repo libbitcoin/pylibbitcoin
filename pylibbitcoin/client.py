@@ -41,8 +41,8 @@ def to_little_endian(i):
 
 
 def create_random_id():
-    MAX_UINT32 = 4294967295
-    return random.randint(0, MAX_UINT32)
+    max_uint32 = 4294967295
+    return random.randint(0, max_uint32)
 
 
 def unpack_table(row_fmt, data):
@@ -60,11 +60,11 @@ def unpack_table(row_fmt, data):
 
 
 def pack_block_index(index):
-    if type(index) == str:
+    if isinstance(index, str):
         index = unhexlify(index)
         assert len(index) == 32
         return index
-    elif type(index) == int:
+    elif isinstance(index, int):
         return struct.pack('<I', index)
     else:
         raise ValueError("Unknown index type, shoud be an int or a byte array")
@@ -120,10 +120,10 @@ class Request:
         """ Use 'create' to create a Request object. The payload is already
         sent."""
         request = Request(command)
-        await request._send(socket, data)
+        await request.send(socket, data)
         return request
 
-    async def _send(self, socket, data):
+    async def send(self, socket, data):
         request = [
             self.command,
             to_little_endian(self.id),
@@ -137,7 +137,7 @@ class Request:
         return self.queue is not None
 
     def __str__(self):
-        return("Request(command, ID) %s, %d" % (self.command, self.id))
+        return "Request(command, ID) {}, {:d}".format(self.command, self.id)
 
 
 class InvalidServerResponseException(Exception):
