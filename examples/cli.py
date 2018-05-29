@@ -29,6 +29,11 @@ def transaction_index(client):
     return client.transaction_index(hash)
 
 
+def block_transaction_hashes(client):
+    height = int(sys.argv[2])
+    return client.block_transaction_hashes(height)
+
+
 def spend(client):
     hash = sys.argv[2]
     index = int(sys.argv[3])
@@ -74,6 +79,7 @@ commands = {
     "unsubscribe_address": unsubscribe_address,
     "broadcast": broadcast,
     "history3": history3,
+    "block_transaction_hashes": block_transaction_hashes,
 }
 
 
