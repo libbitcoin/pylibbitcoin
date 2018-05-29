@@ -9,6 +9,33 @@ import bitcoin.base58
 import pylibbitcoin.error_code
 
 
+def checksum(hash, index):
+    """
+    This method takes a transaction hash and an index and returns a checksum.
+
+    This checksum is based on 49 bits starting from the 12th byte of the
+    reversed hash. Combined with the last 15 bits of the 4 byte index.
+    """
+
+    mask = 0xffffffffffff8000
+    magic_start_position = 12
+
+    hash_bytes = bytes.fromhex(hash)[::-1]
+    last_20_bytes = hash_bytes[magic_start_position:]
+
+    assert len(hash_bytes) == 32
+    assert index < 2**32
+
+    hash_upper_49_bits = to_int(last_20_bytes) & mask
+    index_lower_15_bits = index & ~mask
+
+    return hash_upper_49_bits | index_lower_15_bits
+
+
+def to_int(b):
+    return int.from_bytes(b, byteorder='little')
+
+
 def to_little_endian(i):
     return struct.pack("<I", i)
 
@@ -377,13 +404,21 @@ class Client:
             return ec, None
 
         def make_tuple(row):
-            id, tx_hash, index, height, value = row
-            return (id, bitcoin.core.COutPoint(tx_hash, index), height, value)
+            kind, tx_hash, index, height, value = row
+            return (
+                kind,
+                bitcoin.core.COutPoint(tx_hash, index),
+                height,
+                value,
+                checksum(tx_hash[::-1].hex(), index),
+            )
 
         rows = unpack_table("<B32sIIQ", raw_points)
         points = [make_tuple(row) for row in rows]
 
-        return None, points
+        correlated_points = Client.__correlate(points)
+
+        return None, correlated_points
 
     async def validate(self, block):
         command = b"blockchain.validate"
@@ -396,3 +431,60 @@ class Client:
     async def transaction_pool_validate2(self, tx):
         command = b"transaction_pool.validate2"
         return await self._simple_request(command, unhexlify(tx))
+
+    @staticmethod
+    def __receives_without_spends(history):
+        return (point for point in history if 'spent' not in point)
+
+    @staticmethod
+    def __correlate(points):
+        transfers, checksum_to_index = Client.__find_receives(points)
+        transfers = Client.__correlate_spends_to_receives(
+            points,
+            transfers,
+            checksum_to_index
+        )
+
+        return transfers
+
+    @staticmethod
+    def __correlate_spends_to_receives(points, transfers, checksum_to_index):
+        for point in points:
+            if point[0] == 0:  # receive
+                continue
+
+            spent = {
+                "hash": point[1].hash,
+                "height": point[2],
+                "index": point[1].n,
+            }
+            if point[3] not in checksum_to_index:
+                transfers.append({
+                    "spent": spent
+                })
+            else:
+                transfers[checksum_to_index[point[3]]]["spent"] = spent
+
+        return transfers
+
+    @staticmethod
+    def __find_receives(points):
+        transfers = []
+        checksum_to_index = {}
+
+        for point in points:
+            if point[0] == 1:  # spent
+                continue
+
+            transfers.append({
+                "received": {
+                    "hash": point[1].hash,
+                    "height": point[2],
+                    "index": point[1].n,
+                },
+                "value": point[3],
+            })
+
+            checksum_to_index[point[4]] = len(transfers) - 1
+
+        return transfers, checksum_to_index
