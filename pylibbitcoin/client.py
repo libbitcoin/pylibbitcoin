@@ -2,6 +2,7 @@ import random
 import struct
 import asyncio
 import functools
+import hashlib
 from binascii import unhexlify
 import zmq
 import zmq.asyncio
@@ -12,7 +13,39 @@ import pylibbitcoin.error_code
 
 
 def merkle_tree(hashes):
-    return anytree.Node(name="")
+    if len(hashes) == 0:
+        return None
+
+    # It is a bit of a special case, you'd expect the len == 1 case to be
+    # handled the same as the len % 2 == 1 case.
+    if len(hashes) == 1:
+        return anytree.Node(name=hashes[0])
+
+    leaves = [anytree.Node(name=hash_) for hash_ in hashes]
+
+    def next_layer(nodes):
+        layer = []
+
+        if len(nodes) % 2 == 1:
+            nodes.append(anytree.Node(name=nodes[-1].name))
+
+        while len(nodes) != 0:
+            first = nodes.pop(0)
+            second = nodes.pop(0)
+            parent = anytree.Node(
+                name=hashlib.sha256(
+                    hashlib.sha256(first.name + second.name).digest()).digest()
+            )
+            first.parent = parent
+            second.parent = parent
+            layer.append(parent)
+
+        return layer
+
+    while len(leaves) != 1:
+        leaves = next_layer(leaves)
+
+    return leaves[0]
 
 
 def checksum(hash_, index):
