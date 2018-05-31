@@ -12,6 +12,10 @@ import anytree
 import pylibbitcoin.error_code
 
 
+def merkle_branch(hash_, tree):
+    pass
+
+
 def merkle_tree(hashes):
     if len(hashes) == 0:
         return None
@@ -487,6 +491,13 @@ class Client:
             return error, None
 
         return None, Client.__receives_without_spends(history)
+
+    async def merkle_branch(self, hash_, block_index):
+        error_code, hashes = self.block_transaction_hashes(block_index)
+        if error_code:
+            return error_code, None
+
+        return None, merkle_branch(hash_, merkle_tree(hashes))
 
     @staticmethod
     def __receives_without_spends(history):

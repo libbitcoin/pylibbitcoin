@@ -2,7 +2,7 @@ import unittest
 import binascii
 import hashlib
 from anytree import PreOrderIter
-from pylibbitcoin.client import merkle_tree
+from pylibbitcoin.client import merkle_tree, merkle_branch
 
 
 class TestMerkleTree(unittest.TestCase):
@@ -57,3 +57,21 @@ class TestMerkleTree(unittest.TestCase):
             root.name,
             binascii.unhexlify('8694fe0d737b26b49bf7fc906b90c19aeadfe37c6082a95968825cbdbc183a94')[::-1]  # noqa: E501
         )
+
+
+class TestMerkleBranch(unittest.TestCase):
+    tree = merkle_tree([
+        b'',
+        b'deadbeef',
+        b'01',
+    ])
+
+    def test_hash_not_found(self):
+        branch = merkle_branch(b'02', self.tree)
+
+        self.assertIsNone(branch)
+
+    def test_hash_found(self):
+        branch = merkle_branch(b'deadbeef', self.tree)
+
+        self.assertIsNotNone(branch)
