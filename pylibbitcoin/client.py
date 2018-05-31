@@ -7,7 +7,12 @@ import zmq
 import zmq.asyncio
 import bitcoin.core.serialize
 import bitcoin.base58
+import anytree
 import pylibbitcoin.error_code
+
+
+def merkle_tree(hashes):
+    return anytree.Node(name="")
 
 
 def checksum(hash_, index):
