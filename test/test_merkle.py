@@ -61,17 +61,17 @@ class TestMerkleTree(unittest.TestCase):
 
 class TestMerkleBranch(unittest.TestCase):
     tree = merkle_tree([
-        b'',
-        b'deadbeef',
+        b'00',
         b'01',
+        b'02',
     ])
 
     def test_hash_not_found(self):
-        branch = merkle_branch(b'02', self.tree)
+        branch = merkle_branch(b'deadbeef', self.tree)
 
         self.assertIsNone(branch)
 
     def test_hash_found(self):
-        branch = merkle_branch(b'deadbeef', self.tree)
+        branch = merkle_branch(b'01', self.tree)
 
         self.assertIsNotNone(branch)
