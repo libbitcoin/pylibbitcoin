@@ -97,9 +97,9 @@ def main():
 
     loop = asyncio.get_event_loop()
 
-    ec, result = loop.run_until_complete(commands[sys.argv[1]](client))
-    print("Error code: %s" % ec)
-    print("Result: %s" % result)
+    error_code, result = loop.run_until_complete(commands[sys.argv[1]](client))
+    print("Error code: {}".format(error_code))
+    print("Result: {}".format(result))
 
     if type(result) == asyncio.queues.Queue:
         loop.run_until_complete(_read_from(result))
