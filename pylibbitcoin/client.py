@@ -220,19 +220,27 @@ class RequestCollection:
     RequestCollection carries a list of Requests and matches incoming responses
     to them.
     """
-    def __init__(self, socket):
+    def __init__(self, socket, loop):
         self._socket = socket
         self._requests = {}
 
-        loop = asyncio.get_event_loop()
         self._task = loop.create_task(self._run())
 
     async def _run(self):
         while True:
             await self._receive()
 
-    def stop(self):
+    async def stop(self):
+        """ Stops listening for incoming responses (or subscription messages).
+
+        Returns the number of _responses_ expected but which now are dropped on
+        the floor.
+        """
         self._task.cancel()
+        try:
+            await self._task
+        except asyncio.CancelledError:
+            return len(self._requests)
 
     async def _receive(self):
         frame = await self._socket.recv_multipart()
@@ -272,12 +280,12 @@ class Client:
         self._url = url
         self.settings = settings
         self._socket = self._create_socket()
+        self._loop = asyncio.get_event_loop()
+        self._request_collection = RequestCollection(self._socket, self._loop)
 
-        self._request_collection = RequestCollection(self._socket)
-
-    def stop(self):
-        self._request_collection.stop()
+    async def stop(self):
         self._socket.close()
+        return await self._request_collection.stop()
 
     def _create_socket(self):
         socket = self.settings.context.socket(zmq.DEALER)

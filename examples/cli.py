@@ -104,7 +104,8 @@ def main():
     if type(result) == asyncio.queues.Queue:
         loop.run_until_complete(_read_from(result))
 
-    client.stop()
+    number_of_pending_responses = loop.run_until_complete(client.stop())
+    print("Number of pending responses lost: {}".format(number_of_pending_responses))
     loop.close()
 
 
