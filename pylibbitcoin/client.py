@@ -13,8 +13,8 @@ import pylibbitcoin.error_code
 
 
 def merkle_branch(hash_, tree):
-    iter = anytree.PostOrderIter(tree)
-    node = next((node for node in iter if node.name == hash_), None)
+    tree_walker = anytree.PostOrderIter(tree)
+    node = next((node for node in tree_walker if node.name == hash_), None)
     if not node:
         return None
 
