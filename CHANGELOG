@@ -1,0 +1,10 @@
+0.0.3
+- add 'merkle_branch' method
+- handle stopping client better
+
+0.0.2
+- add 'balance' method
+- add 'unspend' method
+
+0.0.1
+- initial release
