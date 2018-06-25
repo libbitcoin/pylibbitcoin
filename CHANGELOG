@@ -1,3 +1,8 @@
+0.1.0
+- add 'port' parameter to Client constructor
+- add 'subscribe_to_headers' API call
+- add ability to pass user defined event loop in ClientSettings
+
 0.0.3
 - add 'merkle_branch' method
 - handle stopping client better
