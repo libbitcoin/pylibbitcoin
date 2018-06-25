@@ -135,7 +135,9 @@ class ClientSettings:
     @property
     def context(self):
         if not self._context:
-            self._context = zmq.asyncio.Context()
+            ctx = zmq.asyncio.Context()
+            ctx.linger = 500  # in milliseconds
+            self._context = ctx
         return self._context
 
     @context.setter
@@ -220,11 +222,12 @@ class RequestCollection:
     RequestCollection carries a list of Requests and matches incoming responses
     to them.
     """
+
     def __init__(self, socket, loop):
         self._socket = socket
         self._requests = {}
 
-        self._task = loop.create_task(self._run())
+        self._task = asyncio.ensure_future(self._run())
 
     async def _run(self):
         while True:
