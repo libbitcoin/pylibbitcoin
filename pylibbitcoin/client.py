@@ -290,21 +290,38 @@ class RequestCollection:
 
 
 class Client:
+    """This class represents a connection to a remote Libbitcoin server.
 
-    def __init__(self, url, settings=ClientSettings()):
-        self._url = url
-        self.settings = settings
-        self._socket = self._create_socket()
-        self._loop = asyncio.get_event_loop()
-        self._request_collection = RequestCollection(self._socket, self._loop)
+    hostname -- the server DNS name to connect to.
+    ports -- a dictionary containing four keys: query/heartbeat/block/tx
+    """
+
+    def __init__(self, hostname, ports, settings=ClientSettings()):
+        self._hostname = hostname
+        self._ports = ports
+        self._settings = settings
+        self._query_socket = self._create_query_socket()
+        self._block_socket = self._create_block_socket()
+        self._request_collection = RequestCollection(
+            self._query_socket,
+            self._settings.loop)
 
     async def stop(self):
-        self._socket.close()
+        self._query_socket.close()
+        self._block_socket.close()
         return await self._request_collection.stop()
 
-    def _create_socket(self):
-        socket = self.settings.context.socket(zmq.DEALER)
-        socket.connect(self._url)
+    def _create_block_socket(self):
+        socket = self._settings.context.socket(
+            zmq.SUB, io_loop=self._settings.loop)
+        socket.connect(self.__server_url(self._hostname, self._ports["block"]))
+        socket.setsockopt_string(zmq.SUBSCRIBE, '')
+        return socket
+
+    def _create_query_socket(self):
+        socket = self._settings.context.socket(
+            zmq.DEALER, io_loop=self._settings.loop)
+        socket.connect(self.__server_url(self._hostname, self._ports["query"]))
         return socket
 
     async def _subscription_request(self, command, data):
@@ -320,7 +337,7 @@ class Client:
     async def _request(self, command, data):
         """Make a generic request. Both options are byte objects specified like
         b"blockchain.fetch_block_header" as an example."""
-        request = await Request.create(self._socket, command, data)
+        request = await Request.create(self._query_socket, command, data)
         self._request_collection.add_request(request)
 
         return request
@@ -329,7 +346,7 @@ class Client:
         try:
             response = await asyncio.wait_for(
                 request.future,
-                self.settings.timeout)
+                self._settings.timeout)
         except asyncio.TimeoutError:
             self._request_collection.delete_request(request)
             return pylibbitcoin.error_code.ErrorCode.channel_timeout, None
@@ -527,6 +544,24 @@ class Client:
             return error_code, None
 
         return None, merkle_branch(hash_, merkle_tree(hashes))
+
+    async def subscribe_to_headers(self):
+        queue = asyncio.Queue()
+        asyncio.ensure_future(self._listen_for_headers(queue))
+        return queue
+
+    async def _listen_for_headers(self, queue):
+        while True:
+            frame = await self._block_socket.recv_multipart()
+            seq = struct.unpack("<H", frame[0])[0]
+            height = struct.unpack("<I", frame[1])[0]
+            block_data = frame[2]
+            queue.put_nowait(
+                (seq, height, bitcoin.core.CBlock.deserialize(block_data)))
+
+    @staticmethod
+    def __server_url(hostname, port):
+        return "tcp://" + hostname + ":" + str(port)
 
     @staticmethod
     def __receives_without_spends(history):
