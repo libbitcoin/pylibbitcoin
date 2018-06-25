@@ -128,9 +128,10 @@ def decode_address(address):
 
 class ClientSettings:
 
-    def __init__(self, timeout=2, context=None):
+    def __init__(self, timeout=2, context=None, loop=None):
         self._timeout = timeout
         self._context = context
+        self._loop = loop
 
     @property
     def context(self):
@@ -152,6 +153,17 @@ class ClientSettings:
     @timeout.setter
     def timeout(self, timeout):
         self._timeout = timeout
+
+    @property
+    def loop(self):
+        if not self._loop:
+            self._loop = asyncio.get_event_loop()
+
+        return self._loop
+
+    @loop.setter
+    def loop(self, loop):
+        self._loop = loop
 
 
 class Request:
@@ -227,7 +239,7 @@ class RequestCollection:
         self._socket = socket
         self._requests = {}
 
-        self._task = asyncio.ensure_future(self._run())
+        self._task = asyncio.ensure_future(self._run(), loop=loop)
 
     async def _run(self):
         while True:
