@@ -120,6 +120,7 @@ def pack_block_index(index):
 
 
 def decode_address(address):
+    """ Turns a base58check encoded address into a plain p2sh/p2pkh address"""
     decoded_address = bitcoin.base58.decode(address)
     # pick the decoded bytes apart:
     # version_byte, data, checksum = decoded_address[0:1], decoded_address[1:-4], decoded_address[-4:]  # noqa: E501
@@ -460,6 +461,7 @@ class Client:
         return None, transaction
 
     async def subscribe_address(self, address):
+        """Either a p2sh or p2pkh is acceptable"""
         command = b"subscribe.address"
         decoded_address = decode_address(address)
         error_code, queue = await self._subscription_request(
