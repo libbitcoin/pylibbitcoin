@@ -327,7 +327,7 @@ class Client:
 
     async def _subscription_request(self, command, data):
         request = await self._request(command, data)
-        request.queue = asyncio.Queue()
+        request.queue = asyncio.Queue(loop=self._settings._loop)
         error_code, _ = await self._wait_for_response(request)
         return error_code, request.queue
 
@@ -548,7 +548,7 @@ class Client:
         return None, merkle_branch(hash_, merkle_tree(hashes))
 
     async def subscribe_to_headers(self):
-        queue = asyncio.Queue()
+        queue = asyncio.Queue(loop=self._settings._loop)
         asyncio.ensure_future(self._listen_for_headers(queue))
         return queue
 
