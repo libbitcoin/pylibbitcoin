@@ -547,12 +547,12 @@ class Client:
 
         return None, merkle_branch(hash_, merkle_tree(hashes))
 
-    async def subscribe_to_headers(self):
+    async def subscribe_to_blocks(self):
         queue = asyncio.Queue(loop=self._settings._loop)
-        asyncio.ensure_future(self._listen_for_headers(queue))
+        asyncio.ensure_future(self._listen_for_blocks(queue))
         return queue
 
-    async def _listen_for_headers(self, queue):
+    async def _listen_for_blocks(self, queue):
         while True:
             frame = await self._block_socket.recv_multipart()
             seq = struct.unpack("<H", frame[0])[0]
