@@ -93,7 +93,8 @@ def main():
     # client = pylibbitcoin.client.Client("tcp://127.0.0.1:9999", settings=pylibbitcoin.client.ClientSettings(timeout=5))
     # client = pylibbitcoin.client.Client("tcp://mainnet.libbitcoin.net:9091")
 
-    client = pylibbitcoin.client.Client("tcp://testnet1.libbitcoin.net:19091")
+    client = pylibbitcoin.client.Client("mainnet.libbitcoin.net", {"query": 9091,
+        "heartbeat": 9092, "block": 9093, "tx": 9094})
 
     loop = asyncio.get_event_loop()
 
